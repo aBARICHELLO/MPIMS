@@ -10,7 +10,7 @@
  * execução da sua implementação paralela!!
  ***/
 #ifndef DEBUG
-#define DEBUG 0
+#define DEBUG 2
 #endif
 
 #ifndef NELEMENTS
@@ -20,6 +20,14 @@
 #ifndef MAXVAL
 #define MAXVAL 255
 #endif // MAX_VAL
+
+struct double_vector {
+    int* v0;
+    int* v1;
+    int begin;
+    int middle;
+    int end;
+};
 
 /*
  * More info on: http://en.cppreference.com/w/c/language/variadic
@@ -37,39 +45,52 @@ void debug(const char* msg, ...) {
  * Orderly merges two int arrays (numbers[begin..middle] and numbers[middle..end]) into one (sorted).
  * \retval: merged array -> sorted
  */
-void merge(int* numbers, int begin, int middle, int end, int* sorted) {
-    int i = begin;
-    int j = middle;
-    debug("Merging. Begin: %d, Middle: %d, End: %d\n", begin, middle, end);
-    for (int k = begin; k < end; ++k) {
-        debug("LHS[%d]: %d, RHS[%d]: %d\n", i, numbers[i], j, numbers[j]);
-        if (i < middle && (j >= end || numbers[i] < numbers[j])) {
-            sorted[k] = numbers[i];
+void merge(struct double_vector vector, int* sorted) {
+    int i = 0;
+    int j = 0;
+    debug("Merging. Begin: %d, Middle: %d, End: %d\n", vector.begin, vector.middle, vector.end);
+    for (int k = 0; k < vector.end; ++k) {
+        if (vector.v0[i] < vector.v1[j] && (j >= vector.end)) {
+            sorted[k] = vector.v0[i];
             i++;
         } else {
-            sorted[k] = numbers[j];
+            sorted[k] = vector.v1[j];
             j++;
         }
     }
+
+    // int i = begin;
+    // int j = middle;
+    // debug("Merging. Begin: %d, Middle: %d, End: %d\n", begin, middle, end);
+    // for (int k = begin; k < end; ++k) {
+    //     debug("LHS[%d]: %d, RHS[%d]: %d\n", i, numbers[i], j, numbers[j]);
+    //     if (i < middle && (j >= end || numbers[i] < numbers[j])) {
+    //         sorted[k] = numbers[i];
+    //         i++;
+    //     } else {
+    //         sorted[k] = numbers[j];
+    //         j++;
+    //     }
+    // }
 }
 
 /*
  * Merge sort recursive step
  */
-void recursive_merge_sort(int* tmp, int begin, int end, int* numbers) {
-    if (end - begin < 2)
+void recursive_merge_sort(int* sorted, int begin, int end, int* numbers) {
+    if (end - begin < 2) {
         return;
-    else {
+    } else {
         int middle = (begin + end) / 2;
-        recursive_merge_sort(numbers, begin, middle, tmp);
-        recursive_merge_sort(numbers, middle, end, tmp);
-        merge(tmp, begin, middle, end, numbers);
+        recursive_merge_sort(numbers, begin, middle, sorted);
+        recursive_merge_sort(numbers, middle, end, sorted);
+        merge(sorted, begin, middle, end, numbers);
     }
 }
 
 // First Merge Sort call
-void merge_sort(int * numbers, int size, int* tmp) {
-    recursive_merge_sort(numbers, 0, size, tmp);
+void merge_sort(int* numbers, int size, int* sorted) {
+    recursive_merge_sort(numbers, 0, size, sorted);
 }
 
 void print_array(int* array, int size) {
@@ -90,7 +111,7 @@ void populate_array(int* array, int size, int max) {
 int main(int argc, char** argv) {
     int seed, max_val;
     int* sortable;
-    int* tmp;
+    int* sorted;
     size_t arr_size;
 
     // Basic MERGE unit test
@@ -113,7 +134,7 @@ int main(int argc, char** argv) {
         a[0] = 7; a[1] = 6; a[2] = 5; a[3] = 4;
         a[4] = 3; a[5] = 2; a[6] = 1; a[7] = 0;
 
-        b = memcpy(b, a, 8*sizeof(int));
+        b = memcpy(b, a, 8 * sizeof(int));
         merge_sort(a, 8, b);
         print_array(b, 8);
 
@@ -165,16 +186,16 @@ int main(int argc, char** argv) {
 
     srand(seed);
     sortable = malloc(arr_size * sizeof(int));
-    tmp = malloc(arr_size * sizeof(int));
+    sorted = malloc(arr_size * sizeof(int));
 
     populate_array(sortable, arr_size, max_val);
-    tmp = memcpy(tmp, sortable, arr_size * sizeof(int));
+    sorted = memcpy(sorted, sortable, arr_size * sizeof(int));
 
     print_array(sortable, arr_size);
-    merge_sort(sortable, arr_size, tmp);
+    merge_sort(sortable, arr_size, sorted);
     print_array(sortable, arr_size);
 
     free(sortable);
-    free(tmp);
+    free(sorted);
     return 0;
 }
