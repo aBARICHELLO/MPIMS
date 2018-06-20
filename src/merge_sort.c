@@ -5,10 +5,10 @@
 #include <string.h>
 #include <math.h>
 
-/***
- * Todas as Macros pré-definidas devem ser recebidas como parâmetros de
- * execução da sua implementação paralela!!
- ***/
+
+// Todas as Macros pré-definidas devem ser recebidas como parâmetros de
+// execução da sua implementação paralela!!
+
 #ifndef DEBUG
 #define DEBUG 2
 #endif
@@ -24,9 +24,8 @@
 struct double_vector {
     int* v0;
     int* v1;
-    int begin;
-    int middle;
-    int end;
+    int size0;
+    int size1;
 };
 
 /*
@@ -46,16 +45,16 @@ void debug(const char* msg, ...) {
  * \retval: merged array -> sorted
  */
 void merge(struct double_vector vector, int* sorted) {
-    int i = 0;
     int j = 0;
-    debug("Merging. Begin: %d, Middle: %d, End: %d\n", vector.begin, vector.middle, vector.end);
-    for (int k = 0; k < vector.end; ++k) {
-        if (vector.v0[i] < vector.v1[j] && (j >= vector.end)) {
-            sorted[k] = vector.v0[i];
-            i++;
-        } else {
-            sorted[k] = vector.v1[j];
+    int k = 0;
+    debug("Merging. Begin: %d, Middle: %d, End: %d\n");
+    for (int i = 0; i < vector.size0; ++i) {
+        if ((vector.v0[i] < vector.v1[i]) || (k >= vector.size0)) {
+            sorted[i] = vector.v0[j];
             j++;
+        } else {
+            sorted[i] = vector.v1[k];
+            k++;
         }
     }
 
@@ -193,7 +192,7 @@ int main(int argc, char** argv) {
 
     print_array(sortable, arr_size);
     merge_sort(sortable, arr_size, sorted);
-    print_array(sortable, arr_size);
+    print_array(sorted, arr_size);
 
     free(sortable);
     free(sorted);
