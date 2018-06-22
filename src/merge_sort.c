@@ -21,13 +21,15 @@
 #define MAXVAL 255
 #endif // MAX_VAL
 
-struct double_vector {
-    int* v0;
-    int* v1;
-    int size0;
-    int size1;
+struct vector {
+    int* vector;
+    int size;
 };
 
+struct double_vector {
+    struct vector vector0;
+    struct vector vector1;
+};
 /*
  * More info on: http://en.cppreference.com/w/c/language/variadic
  */
@@ -44,18 +46,17 @@ void debug(const char* msg, ...) {
  * Orderly merges two int arrays (numbers[begin..middle] and numbers[middle..end]) into one (sorted).
  * \retval: merged array -> sorted
  */
-void merge(struct double_vector* vector, int* sorted) {
+void merge(struct double_vector* to_be_merged, struct vector* sorted) {
     int i, j;
 	//debug("Merging. Begin: %d, Middle: %d, End: %d\n", begin, middle, end);
-	for (int k = 0; k < vector->size0 + vector->size1; ++k) {
+	for (int k = 0; k < to_be_merged->vector0.size + to_be_merged->vector1.size; ++k) {
 	//	debug("LHS[%d]: %d, RHS[%d]: %d\n", i, numbers[i], j, numbers[j]);
-		if (i < vector->size0 &&
-        (j >= vector->size1 || 
-        vector->v0[i] < vector->v1[j])) {
-			sorted[k] = vector->v0[i];
+		if (i < to_be_merged->vector0.size && (j >= to_be_merged->vector1.size ||
+            to_be_merged->vector0.vector[i] < to_be_merged->vector1.vector[j])) {
+			sorted->vector[k] = to_be_merged->vector0.vector[i];
 			i++;
 		} else {
-            sorted[k] = vector->v1[j];
+            sorted->vector[k] = to_be_merged->vector1.vector[j];
 			j++;
 		}
 	}
