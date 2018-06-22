@@ -44,33 +44,21 @@ void debug(const char* msg, ...) {
  * Orderly merges two int arrays (numbers[begin..middle] and numbers[middle..end]) into one (sorted).
  * \retval: merged array -> sorted
  */
-void merge(struct double_vector vector, int* sorted) {
-    int j = 0;
-    int k = 0;
-    debug("Merging. Begin: %d, Middle: %d, End: %d\n");
-    for (int i = 0; i < vector.size0; ++i) {
-        if ((vector.v0[i] < vector.v1[i]) || (k >= vector.size0)) {
-            sorted[i] = vector.v0[j];
-            j++;
-        } else {
-            sorted[i] = vector.v1[k];
-            k++;
-        }
-    }
-
-    // int i = begin;
-    // int j = middle;
-    // debug("Merging. Begin: %d, Middle: %d, End: %d\n", begin, middle, end);
-    // for (int k = begin; k < end; ++k) {
-    //     debug("LHS[%d]: %d, RHS[%d]: %d\n", i, numbers[i], j, numbers[j]);
-    //     if (i < middle && (j >= end || numbers[i] < numbers[j])) {
-    //         sorted[k] = numbers[i];
-    //         i++;
-    //     } else {
-    //         sorted[k] = numbers[j];
-    //         j++;
-    //     }
-    // }
+void merge(struct double_vector* vector, int* sorted) {
+    int i, j;
+	//debug("Merging. Begin: %d, Middle: %d, End: %d\n", begin, middle, end);
+	for (int k = 0; k < vector->size0 + vector->size1; ++k) {
+	//	debug("LHS[%d]: %d, RHS[%d]: %d\n", i, numbers[i], j, numbers[j]);
+		if (i < vector->size0 &&
+        (j >= vector->size1 || 
+        vector->v0[i] < vector->v1[j])) {
+			sorted[k] = vector->v0[i];
+			i++;
+		} else {
+            sorted[k] = vector->v1[j];
+			j++;
+		}
+	}
 }
 
 /*

@@ -11,15 +11,20 @@ struct double_vector {
 };
 
 void merge(struct double_vector* vector, int* sorted) {
-    int j = 0;
-    int k = 0;
-    for (int i = 0; i < vector->size0 + vector->size1; ++i) {
-        if (vector->v0[j] < vector->v1[k]) {
-            sorted[i] = vector->v0[j++];
-        } else {
-            sorted[i] = vector->v1[k++];
-        }
-    }
+    int i, j;
+	//debug("Merging. Begin: %d, Middle: %d, End: %d\n", begin, middle, end);
+	for (int k = 0; k < vector->size0 + vector->size1; ++k) {
+	//	debug("LHS[%d]: %d, RHS[%d]: %d\n", i, numbers[i], j, numbers[j]);
+		if (i < vector->size0 &&
+        (j >= vector->size1 || 
+        vector->v0[i] < vector->v1[j])) {
+			sorted[k] = vector->v0[i];
+			i++;
+		} else {
+            sorted[k] = vector->v1[j];
+			j++;
+		}
+	}
 }
 
 void print_array(int* array, int size) {
@@ -32,15 +37,15 @@ void print_array(int* array, int size) {
 
 int main(int argc, char** argv) {
     int a0[2] = {1, 5};
-    int a1[1] = {4};
-    int sorted[3];
-    malloc(sizeof(int) * 3);
+    int a1[2] = {4, 6};
+    int sorted[4];
+    malloc(sizeof(int) * 4);
     struct double_vector* dv = malloc(sizeof(struct double_vector));
     dv->v0 = a0;
     dv->v1 = a1;
     dv->size0 = 2;
-    dv->size1 = 1;
+    dv->size1 = 2;
     merge(dv, sorted);
-    print_array(sorted, 3);
+    print_array(sorted, 4);
     return 0;
 }
