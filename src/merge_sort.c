@@ -62,9 +62,7 @@ void merge(struct double_vector* to_be_merged, struct vector* sorted) {
 	}
 }
 
-/*
- * Merge sort recursive step
- */
+// Processo a receber os dados = rank + (2^depth)
 void recursive_merge_sort(int* sorted, int begin, int end, int* numbers) {
     if (end - begin < 2) {
         return;

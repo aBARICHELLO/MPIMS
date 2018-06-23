@@ -39,7 +39,6 @@ void print_array(int* array, int size) {
 }
 
 int main(int argc, char** argv) {
-    printf("aa");
     int a0[2] = {1, 5};
     int a1[2] = {4, 6};
 
