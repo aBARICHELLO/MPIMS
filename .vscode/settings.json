@@ -4,6 +4,10 @@
         "stdio.h": "c",
         "math.h": "c",
         "type_traits": "c",
-        "vector": "c"
+        "vector": "c",
+        "array": "c",
+        "initializer_list": "c",
+        "utility": "c",
+        "string_view": "c"
     }
 }

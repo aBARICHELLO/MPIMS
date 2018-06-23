@@ -57,7 +57,7 @@ void receive_params() {
 }
 
 // Enviar vetor para o filho, junto com os parametros da árvore binária
-void send_vector(struct vector v) {
+void send_vector_to_child(struct vector v) {
     // Cria vetor com os parametros para o filho
     int buffer[3] = {rank, current_depth + 1, v.size};
     // Calcula destino
@@ -70,10 +70,23 @@ void send_vector(struct vector v) {
     current_depth++;
 }
 
-struct vector receive_vector_from_child(int size) {
+void send_vector_to_parent(struct vector vector) {
+    MPI_Send(&vector.size, 1, MPI_INT, parent, TAG_PARAM, MPI_COMM_WORLD);
+    MPI_Send(&vector.vector, vector.size, MPI_INT, parent, TAG_VECTOR, MPI_COMM_WORLD);
+}
+
+// Recebe vetor do nodo filho da árvore binária
+// Nodo a enviar dados na árvore binária = rank + 2^profundidade
+struct vector receive_vector_from_child() {
     int source = rank + pow(2, current_depth);
+    int size;
+    MPI_Recv(&size, 1, MPI_INT, source, TAG_PARAMS, MPI_COMM_WORLD, &st);
+    int buffer[size];
     MPI_Recv(&buffer, size, MPI_INT, source, TAG_VECTOR, MPI_COMM_WORLD, &st);
     current_depth--;
+    struct vector vector;
+    vector.vector = buffer;
+    vector.size = size;
 }
 
 struct vector receive_vector() {
@@ -126,12 +139,12 @@ void debug(const char* msg, ...) {
 
 // Orderly merges two int arrays (numbers[begin..middle] and numbers[middle..end]) into one (sorted).
 // \retval: merged array -> sorted
-void merge(struct double_vector* to_be_merged) {
-    int i, j;
+struct vector merge(struct double_vector* to_be_merged) {
+    int i;
+    int j;
     int sorted[to_be_merged->vector0.size + to_be_merged->vector1.size];
     for (int k = 0; k < to_be_merged->vector0.size + to_be_merged->vector1.size; ++k) {
-        if (i < to_be_merged->vector0.size && (j >= to_be_merged->vector1.size ||
-            to_be_merged->vector0.vector[i] < to_be_merged->vector1.vector[j])) {
+        if (i < to_be_merged->vector0.size && (j >= to_be_merged->vector1.size || to_be_merged->vector0.vector[i] < to_be_merged->vector1.vector[j])) {
             sorted->vector[k] = to_be_merged->vector0.vector[i];
             i++;
         } else {
@@ -146,15 +159,16 @@ void merge(struct double_vector* to_be_merged) {
 // Ordenando sequencialmente a parte minima do vetor
 struct vector sequential_merge_sort(struct vector unsorted) {
     struct double_vector vectors = divide_vector(unsorted);
-    struct vector v0 = sequential_merge_sort(vectors.vector0);
-    struct vector v1 = sequential_merge_sort(vectors.vector1);
+    if(vectors.vector0.size > 2 && vectors.vector1.size > ) {
+        struct vector v0 = sequential_merge_sort(vectors.vector0);
+        struct vector v1 = sequential_merge_sort(vectors.vector1);
+    }
 
     vectors.vector0 = v0;
     vectors.vector1 = v1;
     return merge(vectors);
 }
 
-// First Merge Sort call
 void merge_sort(int* unsorted, int size, int* sorted) {
     // Receber parametros pai, altura e tamanho do vetor
     receive_params();
@@ -176,7 +190,7 @@ void merge_sort(int* unsorted, int size, int* sorted) {
         // Divide vetor em dois
         struct double_vector vectors = divide_vector(unsorted_vector);
         // Envia parte vetor para processo "da direita" na árvore binária
-        send_vector(vectors.vector1);
+        send_vector_to_child(vectors.vector1);
         // Fica com parte para si e repete
         unsorted_vector = vectors.vector0;
     }
@@ -184,10 +198,16 @@ void merge_sort(int* unsorted, int size, int* sorted) {
     // Após reduzir vetor em partes, realizar etapa sequencial
     struct vector my_sorted_vector = sequential_merge_sort(unsorted_vector)
 
+    // Fazendo caminho de volta para receber vetores
     while(current_depth >= original_depth) {
-        struct vector sorted_sub_vector = receive_from_child();
+        // Recebe vetor ordenado do filho
+        struct vector sorted_sub_vector = receive_vector_from_child();
+        //criando estrutura auxiliar
         struct double_vector vectors;
-        merge(vectors);
+        vectors.vector1 = sorted_sub_vector;
+        vectors.vector2 = my_sorted_vector;
+        // Junta vetores ordenados
+        my_sorted_vector = merge(vectors);
     }
 
     send_vector_to_parent(my_sorted_vector);
@@ -219,7 +239,7 @@ int main(int argc, char** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &number_of_processes);
 
     // // TODO: Arrumar casos de debug
-    // // Basic MERGE unit test        
+    // // Basic MERGE unit test
     // if (DEBUG > 1) {
     //     int * a = (int*)malloc(8 * sizeof(int));
     //     a[0] = 1; a[1] = 3; a[2] = 4; a[3] = 7;
@@ -304,6 +324,4 @@ int main(int argc, char** argv) {
     free(sorted);
 
     MPI_Finalize();
-
-    return 0;
 }
