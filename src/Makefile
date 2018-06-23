@@ -10,9 +10,9 @@ all: $(EXEC)
 $(EXEC): merge_sort.o
 	$(CC) -o $@ $^ $(CFLAGS)
 
-test: test.o
-	$(CC) -o $@ $^ $(CFLAGS)
+test:
+	$(CC) -o test.o test.c $(CFLAGS)
 	./test.o
 
 clean:
-	rm *.o $(EXEC)
+	rm *.o *.out
