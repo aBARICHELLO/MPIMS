@@ -117,7 +117,8 @@ struct double_vector divide_vector(struct vector v) {
     struct vector v0 = { .vector = first_v, .size = half };
     struct vector v1 = { .vector = second_v, .size = v.size - half };
     struct double_vector dv = { v0, v1 }; 
-  
+    free(v.vector);
+    
     return dv;
 }
 
@@ -130,7 +131,6 @@ void debug(const char* msg, ...) {
         va_end(args);
     }
 }
-
 
 // Orderly merges two int arrays (numbers[begin..middle] and numbers[middle..end]) into one (sorted).
 // \retval: merged array -> sorted
@@ -151,6 +151,10 @@ struct vector merge(struct double_vector to_be_merged) {
             j++;
         }
     }
+
+    free(to_be_merged.vector0.vector);
+    free(to_be_merged.vector1.vector);
+    
     return sorted;
 }
 
@@ -170,7 +174,7 @@ void merge_sort(int* unsorted, int size, int* sorted) {
     // Receber parametros pai, altura e tamanho do vetor
     receive_params();
     // Calculando tamanho minimo para parar o split dos vetores
-    minimum_vector_size = ceil(size / number_of_processes);
+    minimum_vector_size = (size + number_of_processes - 1) / number_of_processes;
 
     struct vector unsorted_vector = { .size = size, .vector = unsorted};
 

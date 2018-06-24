@@ -28,22 +28,17 @@ struct vector merge(struct double_vector to_be_merged) {
     int i = 0;
     int j = 0;
     int merged_size = to_be_merged.vector0.size + to_be_merged.vector1.size;
-    int sorted_vector[merged_size];
+    int* sorted_vector = malloc(sizeof(int) * merged_size);
 
-    struct vector sorted = {
-        .size = merged_size,
-        .vector = sorted_vector 
-    };
+    struct vector sorted = { .size = merged_size, .vector = sorted_vector };
 
     for (int k = 0; k < to_be_merged.vector0.size + to_be_merged.vector1.size; ++k) {
         if (i < to_be_merged.vector0.size && (j >= to_be_merged.vector1.size || to_be_merged.vector0.vector[i] < to_be_merged.vector1.vector[j])) {
-            // printf("Vetor sorted posição %d recebe %d pois %d < %d\n", k, to_be_merged.vector0.vector[i], to_be_merged.vector0.vector[i], to_be_merged.vector1.vector[j]);
-            printf("k = %d, i = %d, j = %d, elemento = %d\n", k, i, j, to_be_merged.vector0.vector[i]);
+            printf("Vetor sorted posição %d recebe %d pois %d < %d\n", k, to_be_merged.vector0.vector[i], to_be_merged.vector0.vector[i], to_be_merged.vector1.vector[j]);
             sorted.vector[k] = to_be_merged.vector0.vector[i];
             i++;
         } else {
-            // printf("Vetor sorted posicao %d recebe %d pois %d > %d\n", k, to_be_merged.vector1.vector[j], to_be_merged.vector0.vector[i], to_be_merged.vector1.vector[j]);
-            printf("k = %d, i = %d, j = %d, elemento = %d\n", k, i, j, to_be_merged.vector1.vector[j]);
+            printf("Vetor sorted posicao %d recebe %d pois %d > %d\n", k, to_be_merged.vector1.vector[j], to_be_merged.vector0.vector[i], to_be_merged.vector1.vector[j]);
             sorted.vector[k] = to_be_merged.vector1.vector[j];
             j++;
         }
@@ -72,6 +67,19 @@ struct double_vector divide_vector(struct vector v) {
     return dv;
 }
 
+// Ordenando sequencialmente a parte minima do vetor
+struct vector sequential_merge_sort(struct vector unsorted) {
+    struct double_vector vectors = divide_vector(unsorted);
+    
+    if(vectors.vector0.size >= 1 && vectors.vector1.size >= 1) {
+        struct vector v0 = sequential_merge_sort(vectors.vector0);
+        struct vector v1 = sequential_merge_sort(vectors.vector1);
+        vectors.vector0 = v0;
+        vectors.vector1 = v1;
+    }
+    return merge(vectors);
+}
+
 // Teste função merge
 void merge_test() {
     int a0[3] = {1, 5, 7};
@@ -94,14 +102,23 @@ void  divide_vector_test() {
     print_array(divided_vector.vector0.vector, divided_vector.vector0.size); 
     printf("\n");
     print_array(divided_vector.vector1.vector, divided_vector.vector1.size);    
-   
-
 }
 
+void sequential_merge_sort_test() {
+    printf("\n");
+    int a0[7] = {4, 6, 1, 3, 2, 0, -3};
+    struct vector vector = { .vector = a0, .size = 7};
+    struct vector sorted = sequential_merge_sort(vector);
+    print_array(sorted.vector, sorted.size);
+    printf("\n");
+}
 
 int main() {
     printf("Testing merge\n");
     merge_test();
     printf("Testing division\n");
-    divide_vector_test();    
+    divide_vector_test();
+    printf("\n"); 
+    printf("Testing sequential merge sort\n");  
+    sequential_merge_sort_test();
 }

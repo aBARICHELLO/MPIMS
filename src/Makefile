@@ -14,5 +14,8 @@ test:
 	$(CC) -o test.o test.c $(CFLAGS)
 	./test.o
 
+mpi:
+	mpicc merge_sort.c -lm
+
 clean:
 	rm *.o *.out
