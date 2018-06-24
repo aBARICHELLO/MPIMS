@@ -18,14 +18,13 @@
 #define MAXVAL 255
 #endif
 
-int st;
+// Atributos do processo MPI
 int number_of_processes;
 int rank;
 int minimum_vector_size;
 int parent;
 int current_depth;
 int chunk_size;
-
 int original_depth = 0;
 
 // MPI_TAG = 0, parametros
@@ -48,7 +47,7 @@ void receive_params() {
     // Inicializando vetor a ser recebido
     int buffer[3];
     // Recebe parametros da arvore binaria
-    MPI_Recv(&buffer, 3, MPI_INT, MPI_ANY_SOURCE, TAG_PARAMS, MPI_COMM_WORLD, &st);
+    MPI_Recv(&buffer, 3, MPI_INT, MPI_ANY_SOURCE, TAG_PARAMS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     // Atribuindo parametros
     parent = buffer[0];
     current_depth = buffer[1];
@@ -66,13 +65,16 @@ void send_vector_to_child(struct vector v) {
     MPI_Send(&buffer, 3, MPI_INT, destiny, TAG_PARAMS, MPI_COMM_WORLD);
     // Manda vetor
     MPI_Send(&v, v.size, MPI_INT, destiny, TAG_VECTOR, MPI_COMM_WORLD);
+    // Apagando vetor enviado da memoria
+    free(v.vector);
     // Aumenta profundidade do processo
     current_depth++;
 }
 
 void send_vector_to_parent(struct vector vector) {
-    MPI_Send(&vector.size, 1, MPI_INT, parent, TAG_PARAM, MPI_COMM_WORLD);
+    MPI_Send(&vector.size, 1, MPI_INT, parent, TAG_PARAMS, MPI_COMM_WORLD);
     MPI_Send(&vector.vector, vector.size, MPI_INT, parent, TAG_VECTOR, MPI_COMM_WORLD);
+    free(vector.vector);
 }
 
 // Recebe vetor do nodo filho da árvore binária
@@ -80,49 +82,42 @@ void send_vector_to_parent(struct vector vector) {
 struct vector receive_vector_from_child() {
     int source = rank + pow(2, current_depth);
     int size;
-    MPI_Recv(&size, 1, MPI_INT, source, TAG_PARAMS, MPI_COMM_WORLD, &st);
-    int buffer[size];
-    MPI_Recv(&buffer, size, MPI_INT, source, TAG_VECTOR, MPI_COMM_WORLD, &st);
+    MPI_Recv(&size, 1, MPI_INT, source, TAG_PARAMS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    int* buffer = malloc(sizeof(int) * size);
+    MPI_Recv(buffer, size, MPI_INT, source, TAG_VECTOR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     current_depth--;
-    struct vector vector;
-    vector.vector = buffer;
-    vector.size = size;
+    struct vector v = { .vector = buffer, .size = size };
+    
+    return v;
 }
 
 struct vector receive_vector() {
-    int buffer[chunk_size];
-    MPI_Recv(&buffer, chunk_size, MPI_INT, parent, TAG_VECTOR, MPI_COMM_WORLD, &st);
-    struct vector vector;
-    vector->vector = buffer;
-    vector->size = chunk_size;
-    return vector;
+    int* buffer = malloc(sizeof(int) * chunk_size);
+    MPI_Recv(buffer, chunk_size, MPI_INT, parent, TAG_VECTOR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    struct vector v = { .vector = buffer, .size = chunk_size };
+
+    return v;
 }
 
 // Divide o vetor ao meio retornando uma struct double vector
+// Divide o vetor ao meio retornando uma struct double vector
 struct double_vector divide_vector(struct vector v) {
-    struct double_vector dv;
-    int half = ceil(v.size / 2);
-    int first_v[half];
-    int second_v[v.size - half];
+    int half = v.size / 2;
+    int* first_v = malloc(sizeof(int) * half );
+    int* second_v = malloc(sizeof(int) * (v.size - half));
 
-    struct vector v1;
-    struct vector v2;
-
-    for (int i = 0; i < half; i++) {
-        first_v[i] = v[i];
+    for (int i = 0; i <= half; i++) {
+        first_v[i] = v.vector[i];
+    }
+    
+    for (int i = half, j = 0; i < v.size; i++, j++) {
+        second_v[j] = v.vector[i];
     }
 
-    for (int i = half; i < v.size; i++) {
-        second_v[i] = v[i];
-    }
-
-    v0.vector = first_v;
-    v1.vector = second_v;
-    v0.size = half;
-    v1.size = v.size - half;
-
-    dv.vector0 = v0;
-    dv.vector1 = v1;
+    struct vector v0 = { .vector = first_v, .size = half };
+    struct vector v1 = { .vector = second_v, .size = v.size - half };
+    struct double_vector dv = { v0, v1 }; 
+  
     return dv;
 }
 
@@ -139,33 +134,35 @@ void debug(const char* msg, ...) {
 
 // Orderly merges two int arrays (numbers[begin..middle] and numbers[middle..end]) into one (sorted).
 // \retval: merged array -> sorted
-struct vector merge(struct double_vector* to_be_merged) {
-    int i;
-    int j;
-    int sorted[to_be_merged->vector0.size + to_be_merged->vector1.size];
-    for (int k = 0; k < to_be_merged->vector0.size + to_be_merged->vector1.size; ++k) {
-        if (i < to_be_merged->vector0.size && (j >= to_be_merged->vector1.size || to_be_merged->vector0.vector[i] < to_be_merged->vector1.vector[j])) {
-            sorted->vector[k] = to_be_merged->vector0.vector[i];
+struct vector merge(struct double_vector to_be_merged) {
+    int i = 0;
+    int j = 0;
+    int merged_size = to_be_merged.vector0.size + to_be_merged.vector1.size;
+    int* sorted_vector = malloc(sizeof(int) * merged_size);
+
+    struct vector sorted = { .size = merged_size, .vector = sorted_vector };
+
+    for (int k = 0; k < to_be_merged.vector0.size + to_be_merged.vector1.size; ++k) {
+        if (i < to_be_merged.vector0.size && (j >= to_be_merged.vector1.size || to_be_merged.vector0.vector[i] < to_be_merged.vector1.vector[j])) {
+            sorted.vector[k] = to_be_merged.vector0.vector[i];
             i++;
         } else {
-            sorted->vector[k] = to_be_merged->vector1.vector[j];
+            sorted.vector[k] = to_be_merged.vector1.vector[j];
             j++;
         }
     }
-
     return sorted;
 }
 
 // Ordenando sequencialmente a parte minima do vetor
 struct vector sequential_merge_sort(struct vector unsorted) {
     struct double_vector vectors = divide_vector(unsorted);
-    if(vectors.vector0.size > 2 && vectors.vector1.size > ) {
+    if(vectors.vector0.size > 2 && vectors.vector1.size > 2) {
         struct vector v0 = sequential_merge_sort(vectors.vector0);
         struct vector v1 = sequential_merge_sort(vectors.vector1);
+        vectors.vector0 = v0;
+        vectors.vector1 = v1;
     }
-
-    vectors.vector0 = v0;
-    vectors.vector1 = v1;
     return merge(vectors);
 }
 
@@ -175,9 +172,7 @@ void merge_sort(int* unsorted, int size, int* sorted) {
     // Calculando tamanho minimo para parar o split dos vetores
     minimum_vector_size = ceil(size / number_of_processes);
 
-    struct vector unsorted_vector = malloc(sizeof(struct vector));
-    unsorted_vector->vector = unsorted;
-    unsorted_vector->size = size;
+    struct vector unsorted_vector = { .size = size, .vector = unsorted};
 
     // Se rank for zero, utiliza argumento (unsorted)
     if (rank != 0) {
@@ -196,7 +191,7 @@ void merge_sort(int* unsorted, int size, int* sorted) {
     }
 
     // Após reduzir vetor em partes, realizar etapa sequencial
-    struct vector my_sorted_vector = sequential_merge_sort(unsorted_vector)
+    struct vector my_sorted_vector = sequential_merge_sort(unsorted_vector);
 
     // Fazendo caminho de volta para receber vetores
     while(current_depth >= original_depth) {
@@ -204,8 +199,8 @@ void merge_sort(int* unsorted, int size, int* sorted) {
         struct vector sorted_sub_vector = receive_vector_from_child();
         //criando estrutura auxiliar
         struct double_vector vectors;
+        vectors.vector0 = my_sorted_vector;
         vectors.vector1 = sorted_sub_vector;
-        vectors.vector2 = my_sorted_vector;
         // Junta vetores ordenados
         my_sorted_vector = merge(vectors);
     }
