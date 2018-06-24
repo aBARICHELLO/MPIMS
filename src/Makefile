@@ -16,6 +16,7 @@ test:
 
 mpi:
 	mpicc merge_sort.c -lm
+	mpirun -np 1 ./a.out
 
 clean:
 	rm *.o *.out

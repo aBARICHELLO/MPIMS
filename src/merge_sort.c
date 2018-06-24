@@ -42,8 +42,19 @@ struct double_vector {
     struct vector vector1;
 };
 
+void print_array(int* array, int size) {
+    printf("Printing Array:\n");
+    for (int i = 0; i < size; ++i) {
+        printf("%d. ", array[i]);
+    }
+    printf("\n");
+}
+
 // Recebendo parametros do pai
 void receive_params() {
+    if (rank == 0) 
+        return;
+    
     // Inicializando vetor a ser recebido
     int buffer[3];
     // Recebe parametros da arvore binaria
@@ -80,18 +91,18 @@ void send_vector_to_parent(struct vector vector) {
 // Recebe vetor do nodo filho da árvore binária
 // Nodo a enviar dados na árvore binária = rank + 2^profundidade
 struct vector receive_vector_from_child() {
+    current_depth--;
     int source = rank + pow(2, current_depth);
     int size;
     MPI_Recv(&size, 1, MPI_INT, source, TAG_PARAMS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     int* buffer = malloc(sizeof(int) * size);
     MPI_Recv(buffer, size, MPI_INT, source, TAG_VECTOR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    current_depth--;
     struct vector v = { .vector = buffer, .size = size };
     
     return v;
 }
 
-struct vector receive_vector() {
+struct vector receive_vector_from_parent() {
     int* buffer = malloc(sizeof(int) * chunk_size);
     MPI_Recv(buffer, chunk_size, MPI_INT, parent, TAG_VECTOR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     struct vector v = { .vector = buffer, .size = chunk_size };
@@ -161,7 +172,8 @@ struct vector merge(struct double_vector to_be_merged) {
 // Ordenando sequencialmente a parte minima do vetor
 struct vector sequential_merge_sort(struct vector unsorted) {
     struct double_vector vectors = divide_vector(unsorted);
-    if(vectors.vector0.size > 2 && vectors.vector1.size > 2) {
+    
+    if(vectors.vector0.size >= 1 && vectors.vector1.size >= 1) {
         struct vector v0 = sequential_merge_sort(vectors.vector0);
         struct vector v1 = sequential_merge_sort(vectors.vector1);
         vectors.vector0 = v0;
@@ -175,15 +187,13 @@ void merge_sort(int* unsorted, int size, int* sorted) {
     receive_params();
     // Calculando tamanho minimo para parar o split dos vetores
     minimum_vector_size = (size + number_of_processes - 1) / number_of_processes;
-
     struct vector unsorted_vector = { .size = size, .vector = unsorted};
 
     // Se rank for zero, utiliza argumento (unsorted)
     if (rank != 0) {
         // Rank 0 é o único que utiliza o numbers parametro, o resto utiliza o recebido pelo MPI
-        unsorted_vector = receive_vector();
+        unsorted_vector = receive_vector_from_parent();
     }
-
     // Merge sort loop
     while (unsorted_vector.size > minimum_vector_size) {
         // Divide vetor em dois
@@ -198,27 +208,25 @@ void merge_sort(int* unsorted, int size, int* sorted) {
     struct vector my_sorted_vector = sequential_merge_sort(unsorted_vector);
 
     // Fazendo caminho de volta para receber vetores
-    while(current_depth >= original_depth) {
+    while(current_depth > original_depth) {
         // Recebe vetor ordenado do filho
         struct vector sorted_sub_vector = receive_vector_from_child();
         //criando estrutura auxiliar
-        struct double_vector vectors;
-        vectors.vector0 = my_sorted_vector;
-        vectors.vector1 = sorted_sub_vector;
+        struct double_vector vectors = { .vector0 = my_sorted_vector, .vector1 = sorted_sub_vector };
         // Junta vetores ordenados
         my_sorted_vector = merge(vectors);
     }
 
-    send_vector_to_parent(my_sorted_vector);
+    if(rank != 0) {
+        send_vector_to_parent(my_sorted_vector);
+    } else {
+        for(size_t i = 0; i < size; i++) {
+            sorted[i] = my_sorted_vector.vector[i];
+        }
+    }
+
 }
 
-void print_array(int* array, int size) {
-    printf("Printing Array:\n");
-    for (int i = 0; i < size; ++i) {
-        printf("%d. ", array[i]);
-    }
-    printf("\n");
-}
 
 void populate_array(int* array, int size, int max) {
     int m = max + 1;
@@ -228,99 +236,86 @@ void populate_array(int* array, int size, int max) {
 }
 
 int main(int argc, char** argv) {
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &number_of_processes);
+
     int seed, max_val;
     int* sortable;
     int* sorted;
     size_t arr_size;
 
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &number_of_processes);
+    // Basic MERGE-SORT unit test
+    if (DEBUG > 0) {
+        int* a = (int*)malloc(8 * sizeof(int));
+        int* b = (int*)malloc(8 * sizeof(int));
+        a[0] = 7; a[1] = 6; a[2] = 5; a[3] = 4;
+        a[4] = 3; a[5] = 2; a[6] = 1; a[7] = 0;
 
-    // // TODO: Arrumar casos de debug
-    // // Basic MERGE unit test
-    // if (DEBUG > 1) {
-    //     int * a = (int*)malloc(8 * sizeof(int));
-    //     a[0] = 1; a[1] = 3; a[2] = 4; a[3] = 7;
-    //     a[4] = 0; a[5] = 2; a[6] = 5; a[7] = 6;
-    //     int * values = (int*)malloc(8 * sizeof(int));
-    //     merge(a, 0, 4, 8, values);
-    //     free(a);
-    //     print_array(values, 8);
-    //     free(values);
-    //     return 2;
-    // }
+        b = memcpy(b, a, 8 * sizeof(int));
+        merge_sort(a, 8, b);
+        print_array(b, 8);
 
-    // // Basic MERGE-SORT unit test
-    // if (DEBUG > 0) {
-    //     int* a = (int*)malloc(8 * sizeof(int));
-    //     int* b = (int*)malloc(8 * sizeof(int));
-    //     a[0] = 7; a[1] = 6; a[2] = 5; a[3] = 4;
-    //     a[4] = 3; a[5] = 2; a[6] = 1; a[7] = 0;
+        free(a);
+        free(b);
 
-    //     b = memcpy(b, a, 8 * sizeof(int));
-    //     merge_sort(a, 8, b);
-    //     print_array(b, 8);
+        a = (int*)malloc(9 * sizeof(int));
+        b = (int*)malloc(9 * sizeof(int));
+        a[0] = 3; a[1] = 2; a[2] = 1;
+        a[3] = 10; a[4] = 11; a[5] = 12;
+        a[6] = 0; a[7] = 1; a[8] = 1;
 
-    //     free(a);
-    //     free(b);
+        b = memcpy(b, a, 9*sizeof(int));
+        print_array(b, 9);
+        merge_sort(a, 9, b);
+        print_array(b, 9);
 
-    //     a = (int*)malloc(9 * sizeof(int));
-    //     b = (int*)malloc(9 * sizeof(int));
-    //     a[0] = 3; a[1] = 2; a[2] = 1;
-    //     a[3] = 10; a[4] = 11; a[5] = 12;
-    //     a[6] = 0; a[7] = 1; a[8] = 1;
-
-    //     b = memcpy(b, a, 9*sizeof(int));
-    //     print_array(b, 9);
-    //     merge_sort(a, 9, b);
-    //     print_array(b, 9);
-
-    //     free(a);
-    //     free(b);
-    //     printf("\n");
-    //     return 1;
-    // }
-
-    switch (argc) {
-        case 1:
-            seed = time(NULL);
-            arr_size = NELEMENTS;
-            max_val = MAXVAL;
-            break;
-        case 2:
-            seed = atoi(argv[1]);
-            arr_size = NELEMENTS;
-            max_val = MAXVAL;
-            break;
-        case 3:
-            seed = atoi(argv[1]);
-            arr_size = atoi(argv[2]);
-            max_val = MAXVAL;
-            break;
-        case 4:
-            seed = atoi(argv[1]);
-            arr_size = atoi(argv[2]);
-            max_val = atoi(argv[3]);
-            break;
-        default:
-            printf("Too many arguments\n");
-            break;
+        free(a);
+        free(b);
+        printf("\n");
+        MPI_Finalize();
+        return 0;
     }
 
-    srand(seed);
-    sortable = malloc(arr_size * sizeof(int));
-    sorted = malloc(arr_size * sizeof(int));
+    // switch (argc) {
+    //     case 1:
+    //         seed = time(NULL);
+    //         arr_size = NELEMENTS;
+    //         max_val = MAXVAL;
+    //         break;
+    //     case 2:
+    //         seed = atoi(argv[1]);
+    //         arr_size = NELEMENTS;
+    //         max_val = MAXVAL;
+    //         break;
+    //     case 3:
+    //         seed = atoi(argv[1]);
+    //         arr_size = atoi(argv[2]);
+    //         max_val = MAXVAL;
+    //         break;
+    //     case 4:
+    //         seed = atoi(argv[1]);
+    //         arr_size = atoi(argv[2]);
+    //         max_val = atoi(argv[3]);
+    //         break;
+    //     default:
+    //         printf("Too many arguments\n");
+    //         break;
+    // }
 
-    populate_array(sortable, arr_size, max_val);
-    sorted = memcpy(sorted, sortable, arr_size * sizeof(int));
+    // srand(seed);
+    // sortable = malloc(arr_size * sizeof(int));
+    // sorted = malloc(arr_size * sizeof(int));
 
-    print_array(sortable, arr_size);
-    merge_sort(sortable, arr_size, sorted);
-    print_array(sorted, arr_size);
+    // populate_array(sortable, arr_size, max_val);
+    // sorted = memcpy(sorted, sortable, arr_size * sizeof(int));
 
-    free(sortable);
-    free(sorted);
+    // print_array(sortable, arr_size);
+    // merge_sort(sortable, arr_size, sorted);
+    // print_array(sorted, arr_size);
+
+    // free(sortable);
+    // free(sorted);
 
     MPI_Finalize();
 }
