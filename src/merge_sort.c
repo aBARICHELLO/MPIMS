@@ -75,7 +75,7 @@ void send_vector_to_child(struct vector v) {
     // Manda parametros
     MPI_Send(&buffer, 3, MPI_INT, destiny, TAG_PARAMS, MPI_COMM_WORLD);
     // Manda vetor
-    MPI_Send(&v, v.size, MPI_INT, destiny, TAG_VECTOR, MPI_COMM_WORLD);
+    MPI_Send(v.vector, v.size, MPI_INT, destiny, TAG_VECTOR, MPI_COMM_WORLD);
     // Apagando vetor enviado da memoria
     free(v.vector);
     // Aumenta profundidade do processo
@@ -84,7 +84,7 @@ void send_vector_to_child(struct vector v) {
 
 void send_vector_to_parent(struct vector vector) {
     MPI_Send(&vector.size, 1, MPI_INT, parent, TAG_PARAMS, MPI_COMM_WORLD);
-    MPI_Send(&vector.vector, vector.size, MPI_INT, parent, TAG_VECTOR, MPI_COMM_WORLD);
+    MPI_Send(vector.vector, vector.size, MPI_INT, parent, TAG_VECTOR, MPI_COMM_WORLD);
     free(vector.vector);
 }
 
@@ -254,25 +254,26 @@ int main(int argc, char** argv) {
 
         b = memcpy(b, a, 8 * sizeof(int));
         merge_sort(a, 8, b);
-        print_array(b, 8);
+        if(rank == 0)
+            print_array(b, 8);
 
         free(a);
         free(b);
 
-        a = (int*)malloc(9 * sizeof(int));
-        b = (int*)malloc(9 * sizeof(int));
-        a[0] = 3; a[1] = 2; a[2] = 1;
-        a[3] = 10; a[4] = 11; a[5] = 12;
-        a[6] = 0; a[7] = 1; a[8] = 1;
+        // a = (int*)malloc(9 * sizeof(int));
+        // b = (int*)malloc(9 * sizeof(int));
+        // a[0] = 3; a[1] = 2; a[2] = 1;
+        // a[3] = 10; a[4] = 11; a[5] = 12;
+        // a[6] = 0; a[7] = 1; a[8] = 1;
 
-        b = memcpy(b, a, 9*sizeof(int));
-        print_array(b, 9);
-        merge_sort(a, 9, b);
-        print_array(b, 9);
+        // b = memcpy(b, a, 9*sizeof(int));
+        // print_array(b, 9);
+        // merge_sort(a, 9, b);
+        // print_array(b, 9);
 
-        free(a);
-        free(b);
-        printf("\n");
+        // free(a);
+        // free(b);
+        // printf("\n");
         MPI_Finalize();
         return 0;
     }
