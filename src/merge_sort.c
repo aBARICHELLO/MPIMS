@@ -43,7 +43,8 @@ struct double_vector {
 };
 
 void print_array(int* array, int size) {
-    //printf("Printing Array:\n");
+    if (rank != 0) return;
+    printf("Printing Array:\n");
     for (int i = 0; i < size; ++i) {
         printf("%d. ", array[i]);
     }
@@ -71,7 +72,7 @@ void receive_params() {
 void send_vector_to_child(struct vector v) {
     // Cria vetor com os parametros para o filho
     int buffer[3] = {rank, current_depth + 1, v.size};
-    // Calcula A Formula Do Destino.
+    // Calcula destino
     int destiny = rank + pow(2, current_depth);
     // Manda parametros
     MPI_Send(&buffer, 3, MPI_INT, destiny, TAG_PARAMS, MPI_COMM_WORLD);
@@ -103,6 +104,7 @@ struct vector receive_vector_from_child() {
     return v;
 }
 
+// Funcao para recebe vetor desordenado do pai
 struct vector receive_vector_from_parent() {
     int* buffer = malloc(sizeof(int) * chunk_size);
     MPI_Recv(buffer, chunk_size, MPI_INT, parent, TAG_VECTOR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -111,7 +113,6 @@ struct vector receive_vector_from_parent() {
     return v;
 }
 
-// Divide o vetor ao meio retornando uma struct double vector
 // Divide o vetor ao meio retornando uma struct double vector
 struct double_vector divide_vector(struct vector v) {
     int half = v.size / 2;
@@ -134,7 +135,6 @@ struct double_vector divide_vector(struct vector v) {
     return dv;
 }
 
-// More info on: http://en.cppreference.com/w/c/language/variadic
 void debug(const char* msg, ...) {
     if (DEBUG > 2) {
         va_list args;
@@ -144,8 +144,6 @@ void debug(const char* msg, ...) {
     }
 }
 
-// Orderly merges two int arrays (numbers[begin..middle] and numbers[middle..end]) into one (sorted).
-// \retval: merged array -> sorted
 struct vector merge(struct double_vector to_be_merged) {
     int i = 0;
     int j = 0;
@@ -174,7 +172,7 @@ struct vector merge(struct double_vector to_be_merged) {
 struct vector sequential_merge_sort(struct vector unsorted) {
     struct double_vector vectors = divide_vector(unsorted);
     
-    if(vectors.vector0.size >= 1 && vectors.vector1.size >= 1) {
+    if (vectors.vector0.size >= 1 && vectors.vector1.size >= 1) {
         struct vector v0 = sequential_merge_sort(vectors.vector0);
         struct vector v1 = sequential_merge_sort(vectors.vector1);
         vectors.vector0 = v0;
@@ -208,14 +206,11 @@ void merge_sort(int* unsorted, int size, int* sorted) {
         unsorted_vector = vectors.vector0;
     }
 
-    printf("\nProcesso %d pegou\n", rank);
-    print_array(unsorted_vector.vector, unsorted_vector.size);
-    printf("\n");
     // Após reduzir vetor em partes, realizar etapa sequencial
     struct vector my_sorted_vector = sequential_merge_sort(unsorted_vector);
 
     // Fazendo caminho de volta para receber vetores
-    while(current_depth > original_depth) {
+    while (current_depth > original_depth) {
         // Recebe vetor ordenado do filho
         struct vector sorted_sub_vector = receive_vector_from_child();
         //criando estrutura auxiliar
@@ -224,7 +219,9 @@ void merge_sort(int* unsorted, int size, int* sorted) {
         my_sorted_vector = merge(vectors);
     }
 
-    if(rank != 0) {
+    // Se for filho, deve enviar vetor ordenado para o pai
+    // Se for o processo 0, deve copiar vetor ordenado para retornar
+    if (rank != 0) {
         send_vector_to_parent(my_sorted_vector);
     } else {
         for(size_t i = 0; i < size; i++) {
@@ -233,7 +230,6 @@ void merge_sort(int* unsorted, int size, int* sorted) {
     }
 
 }
-
 
 void populate_array(int* array, int size, int max) {
     int m = max + 1;
@@ -252,38 +248,37 @@ int main(int argc, char** argv) {
     int* sorted;
     size_t arr_size;
 
-    // // Basic MERGE-SORT unit test
-    // if (DEBUG > 0) {
-    //     int* a = (int*)malloc(8 * sizeof(int));
-    //     int* b = (int*)malloc(8 * sizeof(int));
-    //     a[0] = 7; a[1] = 6; a[2] = 5; a[3] = 4;
-    //     a[4] = 3; a[5] = 2; a[6] = 1; a[7] = 0;
+    // Basic MERGE-SORT unit test
+    if (DEBUG > 0) {
+        int* a = (int*)malloc(8 * sizeof(int));
+        int* b = (int*)malloc(8 * sizeof(int));
+        a[0] = 7; a[1] = 6; a[2] = 5; a[3] = 4;
+        a[4] = 3; a[5] = 2; a[6] = 1; a[7] = 0;
 
-    //     b = memcpy(b, a, 8 * sizeof(int));
-    //     merge_sort(a, 8, b);
-    //     if(rank == 0)
-    //         print_array(b, 8);
+        b = memcpy(b, a, 8 * sizeof(int));
+        merge_sort(a, 8, b);
+        print_array(b, 8);
 
-    //     free(a);
-    //     free(b);
+        free(a);
+        free(b);
 
-    //     // a = (int*)malloc(9 * sizeof(int));
-    //     // b = (int*)malloc(9 * sizeof(int));
-    //     // a[0] = 3; a[1] = 2; a[2] = 1;
-    //     // a[3] = 10; a[4] = 11; a[5] = 12;
-    //     // a[6] = 0; a[7] = 1; a[8] = 1;
+        a = (int*)malloc(9 * sizeof(int));
+        b = (int*)malloc(9 * sizeof(int));
+        a[0] = 3; a[1] = 2; a[2] = 1;
+        a[3] = 10; a[4] = 11; a[5] = 12;
+        a[6] = 0; a[7] = 1; a[8] = 1;
 
-    //     // b = memcpy(b, a, 9*sizeof(int));
-    //     // print_array(b, 9);
-    //     // merge_sort(a, 9, b);
-    //     // print_array(b, 9);
+        b = memcpy(b, a, 9*sizeof(int));
+        print_array(b, 9);
+        merge_sort(a, 9, b);
+        print_array(b, 9);
 
-    //     // free(a);
-    //     // free(b);
-    //     // printf("\n");
-    //     MPI_Finalize();
-    //     return 0;
-    // }
+        free(a);
+        free(b);
+        printf("\n");
+        MPI_Finalize();
+        return 0;
+    }
 
     switch (argc) {
         case 1:
@@ -318,12 +313,9 @@ int main(int argc, char** argv) {
     populate_array(sortable, arr_size, max_val);
     sorted = memcpy(sorted, sortable, arr_size * sizeof(int));
 
-    if(rank == 0)
-        print_array(sortable, arr_size);
-    
-    merge_sort(sortable, arr_size, sorted);
-    if(rank == 0)    
-         print_array(sorted, arr_size);
+    print_array(sortable, arr_size);
+    merge_sort(sortable, arr_size, sorted);    
+    print_array(sorted, arr_size);
 
     free(sortable);
     free(sorted);
